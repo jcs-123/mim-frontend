@@ -165,39 +165,84 @@ const AdminDashboard = () => {
     refreshAll();
   }, []);
 
-  const refreshAll = async () => {
-    const [c1, c2, c3, c4] = await Promise.all([
-      axios.get(`${API_URL}/count`),
+const refreshAll = async () => {
+  try {
+    const [
+      studentsRes,
+      complaintRes,
+      apologyRes,
+      messcutDetailsRes,
+      messcutPendingRes,
+    ] = await Promise.all([
+      axios.get(`${API_URL}/studentprofile/api`),
       axios.get(`${API_URL}/allcomplaint/count`),
       axios.get(`${API_URL}/count/pending`),
       axios.get(`${API_URL}/api/messcut/all-details`),
+      axios.get(`${API_URL}/messcut/clear/count`),
     ]);
 
-    setTotalStudents(c1.data.totalStudents || 0);
-    setOccupiedRooms(c1.data.occupiedRooms || 0);
+    /* =====================================================
+       STUDENT COUNT (ACCURATE)
+    ===================================================== */
+    const students = studentsRes.data.data || [];
+    const totalStudentCount = students.length;
 
-    setComplaintTotal(c2.data.total || 0);
-    setComplaintPending(c2.data.pending || 0);
+    /* =====================================================
+       OCCUPIED ROOMS COUNT (roomNo EXISTS)
+       👉 one student = one occupied room count
+    ===================================================== */
+const occupiedRoomCount = new Set(
+  students
+    .filter(s => s.roomNo && s.roomNo.trim() !== "")
+    .map(s => s.roomNo.trim().toUpperCase())
+).size;
 
-    setApologyPending(c3.data.pending || 0);
+setTotalStudents(totalStudentCount);
+setOccupiedRooms(occupiedRoomCount);
+    /* =====================================================
+       COMPLAINTS
+    ===================================================== */
+    setComplaintTotal(complaintRes.data.data?.total || 0);
+    setComplaintPending(complaintRes.data.data?.pending || 0);
 
+    /* =====================================================
+       APOLOGIES
+    ===================================================== */
+    setApologyPending(apologyRes.data.data?.pending || 0);
+
+    /* =====================================================
+       LEAVING / RETURNING TODAY (MESSCUT)
+    ===================================================== */
     const today = new Date().toISOString().split("T")[0];
-    let leave = 0,
-      ret = 0;
+    let leaving = 0;
+    let returning = 0;
 
-    c4.data.data.forEach((d) => {
+    (messcutDetailsRes.data.data || []).forEach((d) => {
       if (d.status === "ACCEPT") {
-        if (d.leavingDate === today) leave++;
-        if (d.returningDate === today) ret++;
+        if (d.leavingDate === today) leaving++;
+        if (d.returningDate === today) returning++;
       }
     });
 
-    setLeavingToday(leave);
-    setReturningToday(ret);
+    setLeavingToday(leaving);
+    setReturningToday(returning);
 
-    const pending = await axios.get(`${API_URL}/messcut/clear/count`);
-    setMesscutPending(pending.data.pending || 0);
-  };
+    /* =====================================================
+       PENDING MESSCUT
+    ===================================================== */
+    setMesscutPending(messcutPendingRes.data.data?.pending || 0);
+
+    /* =====================================================
+       DEBUG (OPTIONAL – REMOVE LATER)
+    ===================================================== */
+    console.log("✅ Total Students:", totalStudentCount);
+    console.log("🏠 Occupied Rooms:", occupiedRoomCount);
+
+  } catch (error) {
+    console.error("❌ Dashboard API error:", error);
+  }
+};
+
 
   const pieSmall = {
     labels: ["Messcut", "Complaints", "Apologies"],
