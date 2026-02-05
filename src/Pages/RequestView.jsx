@@ -56,76 +56,83 @@ function RequestView() {
   /* =========================================
      🟩 Fetch Requests (Only Pending)
   ========================================= */
-useEffect(() => {
-  let mounted = true; // ✅ Prevent duplicate calls in React Strict Mode
+  useEffect(() => {
+    let mounted = true; // ✅ Prevent duplicate calls in React Strict Mode
 
-  const fetchRequests = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`${API_URL}/all`);
-      if (mounted && res.data.success) {
-        // ✅ Filter only pending requests
-        const pending = (res.data.data || []).filter(
-          (r) => r.status === "Pending"
-        );
-        setRequests(pending);
+    const fetchRequests = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${API_URL}/all`);
+        if (mounted && res.data.success) {
+          // ✅ Filter only pending requests
+          const pending = (res.data.data || []).filter(
+            (r) => r.status === "Pending"
+          );
+          setRequests(pending);
 
-        // ✅ Clear previous toasts before showing new one
-        toast.dismiss();
+          // ✅ Clear previous toasts before showing new one
+          toast.dismiss();
 
-        if (pending.length > 0) {
-          toast.info(`📦 Loaded ${pending.length} pending requests`, {
-            ...toastConfig,
-            style: {
-              background: "linear-gradient(135deg, #1565C0, #42A5F5)",
-              color: "#fff",
-              fontWeight: 600,
-            },
-          });
-        } else {
-          toast.warning("✅ No pending requests found", {
-            ...toastConfig,
-            style: {
-              background: "linear-gradient(135deg, #546E7A, #90A4AE)",
-              color: "#fff",
-              fontWeight: 600,
-            },
-          });
+          if (pending.length > 0) {
+            toast.info(`📦 Loaded ${pending.length} pending requests`, {
+              ...toastConfig,
+              style: {
+                background: "linear-gradient(135deg, #1565C0, #42A5F5)",
+                color: "#fff",
+                fontWeight: 600,
+              },
+            });
+          } else {
+            toast.warning("✅ No pending requests found", {
+              ...toastConfig,
+              style: {
+                background: "linear-gradient(135deg, #546E7A, #90A4AE)",
+                color: "#fff",
+                fontWeight: 600,
+              },
+            });
+          }
+        } else if (mounted) {
+          toast.dismiss();
+          toast.error("❌ Failed to load requests", toastConfig);
         }
-      } else if (mounted) {
-        toast.dismiss();
-        toast.error("❌ Failed to load requests", toastConfig);
+      } catch (err) {
+        if (mounted) {
+          console.error("❌ Fetch Error:", err);
+          toast.dismiss();
+          toast.error("🚨 Server connection error", toastConfig);
+        }
+      } finally {
+        if (mounted) setLoading(false);
       }
-    } catch (err) {
-      if (mounted) {
-        console.error("❌ Fetch Error:", err);
-        toast.dismiss();
-        toast.error("🚨 Server connection error", toastConfig);
-      }
-    } finally {
-      if (mounted) setLoading(false);
+    };
+
+    fetchRequests();
+
+    // ✅ Cleanup to prevent duplicate side-effects on remount
+    return () => {
+      mounted = false;
+      toast.dismiss(); // optional: clear any lingering toast on unmount
+    };
+  }, []);
+
+  const getParentStatusChip = (status) => {
+    switch (status) {
+      case "APPROVE":
+        return <Chip label="Approved" color="success" size="small" />;
+      case "REJECT":
+        return <Chip label="Rejected" color="error" size="small" />;
+      default:
+        return (
+          <Chip
+            label="Pending"
+            color="warning"
+            size="small"
+            variant="outlined"
+          />
+        );
     }
   };
-
-  fetchRequests();
-
-  // ✅ Cleanup to prevent duplicate side-effects on remount
-  return () => {
-    mounted = false;
-    toast.dismiss(); // optional: clear any lingering toast on unmount
-  };
-}, []);
-
-const getParentStatusChip = (status) => {
-  switch (status) {
-    case "APPROVE":
-      return <Chip label="Approved" color="success" size="small" />;
-    case "REJECT":
-      return <Chip label="Rejected" color="error" size="small" />;
-    default:
-      return <Chip label="Pending" color="warning" size="small" variant="outlined" />;
-  }
-};
 
   /* =========================================
      🟩 Update Status (Accept/Reject)
@@ -187,7 +194,7 @@ const getParentStatusChip = (status) => {
   );
 
   /* =========================================
-     🟩 Mobile Card View
+     🟩 Mobile Card View - UPDATED
   ========================================= */
   const MobileCard = ({ request }) => (
     <Card
@@ -201,51 +208,95 @@ const getParentStatusChip = (status) => {
       }}
     >
       <CardContent sx={{ p: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600}>
-          {request.name}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Room {request.roomNo} • {request.admissionNo}
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          <strong>Leave:</strong> {request.leavingDate} →{" "}
-          {request.returningDate}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          <strong>Reason:</strong> {request.reason}
-        </Typography>
+        {/* Student Info */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {request.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Room {request.roomNo} • {request.admissionNo}
+          </Typography>
+        </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mt: 1.5,
-          }}
-        >
-          <Chip label="Pending" color="warning" size="small" />
-          <Box sx={{ display: "flex", gap: 1 }}>
-            <Button
-              size="small"
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircle />}
-              disabled={actionLoading}
-              onClick={() => handleAction(request._id, "ACCEPT")}
-            >
-              Accept
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<Cancel />}
-              disabled={actionLoading}
-              onClick={() => handleAction(request._id, "REJECT")}
-            >
-              Reject
-            </Button>
+        {/* Dates and Times */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" fontWeight={500} color="primary">
+            Leave Details:
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, ml: 1 }}>
+            <Typography variant="body2">
+              <strong>Date:</strong> {request.leavingDate}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Time:</strong> {request.leavingTime}
+            </Typography>
           </Box>
+
+          <Typography variant="body2" fontWeight={500} color="primary" sx={{ mt: 1 }}>
+            Return Details:
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, ml: 1 }}>
+            <Typography variant="body2">
+              <strong>Date:</strong> {request.returningDate}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Time:</strong> {request.returningTime}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Reason */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" fontWeight={500} color="primary">
+            Reason:
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+            {request.reason}
+          </Typography>
+        </Box>
+
+        {/* Status Section */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" fontWeight={500}>
+                Parent:
+              </Typography>
+              {getParentStatusChip(request.parentStatus)}
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" fontWeight={500}>
+                Admin:
+              </Typography>
+              <Chip label="Pending" color="warning" size="small" variant="outlined" />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Action Buttons */}
+        <Box sx={{ display: "flex", gap: 1, justifyContent: "center", mt: 1 }}>
+          <Button
+            size="small"
+            variant="contained"
+            color="success"
+            startIcon={<CheckCircle />}
+            disabled={actionLoading}
+            onClick={() => handleAction(request._id, "ACCEPT")}
+            sx={{ flex: 1 }}
+          >
+            Accept
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<Cancel />}
+            disabled={actionLoading}
+            onClick={() => handleAction(request._id, "REJECT")}
+            sx={{ flex: 1 }}
+          >
+            Reject
+          </Button>
         </Box>
       </CardContent>
     </Card>
@@ -255,7 +306,11 @@ const getParentStatusChip = (status) => {
      🟩 Main Render
   ========================================= */
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
       <Box
         sx={{
           p: { xs: 2, sm: 3 },
@@ -305,7 +360,9 @@ const getParentStatusChip = (status) => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               InputProps={{
-                startAdornment: <Search sx={{ mr: 1, color: "text.secondary" }} />,
+                startAdornment: (
+                  <Search sx={{ mr: 1, color: "text.secondary" }} />
+                ),
               }}
               sx={{
                 "& .MuiOutlinedInput-root": {
@@ -350,9 +407,9 @@ const getParentStatusChip = (status) => {
                       "Student Name",
                       "Admission No",
                       "Leaving Date",
-                       "Leaving Time",
+                      "Leaving Time",
                       "Returning Date",
-                             "Returning Time",
+                      "Returning Time",
                       "Reason",
                       "Parent Status",
                       "Status",
@@ -383,20 +440,28 @@ const getParentStatusChip = (status) => {
                         <TableCell align="center">{row.name}</TableCell>
                         <TableCell align="center">{row.admissionNo}</TableCell>
                         <TableCell align="center">{row.leavingDate}</TableCell>
-                                                <TableCell align="center">{row.leavingTime}</TableCell>
-
+                        <TableCell align="center">{row.leavingTime}</TableCell>
                         <TableCell align="center">{row.returningDate}</TableCell>
-                                                <TableCell align="center">{row.returningTime}</TableCell>
-
+                        <TableCell align="center">{row.returningTime}</TableCell>
                         <TableCell align="center">{row.reason}</TableCell>
-                            <TableCell align="center">
-        {getParentStatusChip(row.parentStatus)}
-      </TableCell>
                         <TableCell align="center">
-                          <Chip label="Pending" color="warning" variant="outlined" />
+                          {getParentStatusChip(row.parentStatus)}
                         </TableCell>
                         <TableCell align="center">
-                          <Box sx={{ display: "flex", justifyContent: "center", gap: 1 }}>
+                          <Chip
+                            label="Pending"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "center",
+                              gap: 1,
+                            }}
+                          >
                             <Button
                               size="small"
                               variant="contained"
@@ -423,7 +488,7 @@ const getParentStatusChip = (status) => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                         <Typography color="text.secondary">
                           No pending requests found
                         </Typography>

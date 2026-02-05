@@ -178,12 +178,12 @@ const fetchReport = async () => {
     // date
     if (fromDate)
       data = data.filter(
-        (d) => new Date(d.leavingDate) >= new Date(fromDate)
+        (d) => new Date(d.returningDate) >= new Date(fromDate)
       );
 
     if (toDate)
       data = data.filter(
-        (d) => new Date(d.leavingDate) <= new Date(toDate)
+        (d) => new Date(d.returningDate) <= new Date(toDate)
       );
 
     return data;
