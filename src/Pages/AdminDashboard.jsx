@@ -20,6 +20,7 @@ import {
   EventAvailable,
   EventBusy,
   Restaurant,
+  EventSeat,
 } from "@mui/icons-material";
 
 import axios from "axios";
@@ -45,6 +46,11 @@ const useCountUp = (value, duration = 700) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
+    if (!value) {
+      setCount(0);
+      return;
+    }
+
     let start = 0;
     const step = value / (duration / 16);
     const timer = setInterval(() => {
@@ -56,14 +62,15 @@ const useCountUp = (value, duration = 700) => {
         setCount(Math.floor(start));
       }
     }, 16);
+
     return () => clearInterval(timer);
-  }, [value]);
+  }, [value, duration]);
 
   return count;
 };
 
 /* =====================================================
-   ANIMATION VARIANTS
+   ANIMATION
 ===================================================== */
 const fadeUp = {
   hidden: { opacity: 0, y: 25 },
@@ -87,10 +94,7 @@ const PieWrapper = ({ data }) => {
           plugins: {
             legend: {
               position: isMobile ? "bottom" : "right",
-              labels: {
-                usePointStyle: true,
-                padding: 18,
-              },
+              labels: { usePointStyle: true, padding: 18 },
             },
           },
         }}
@@ -120,7 +124,6 @@ const StatCard = ({ title, value, icon, color, delay }) => {
           height: "100%",
           boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
           borderLeft: `4px solid ${color}`,
-          background: "#ffffff",
         }}
       >
         <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -132,14 +135,7 @@ const StatCard = ({ title, value, icon, color, delay }) => {
               {title}
             </Typography>
           </Box>
-          <Avatar
-            sx={{
-              bgcolor: `${color}15`,
-              color: color,
-              width: 48,
-              height: 48,
-            }}
-          >
+          <Avatar sx={{ bgcolor: `${color}15`, color, width: 48, height: 48 }}>
             {icon}
           </Avatar>
         </Box>
@@ -149,103 +145,123 @@ const StatCard = ({ title, value, icon, color, delay }) => {
 };
 
 /* =====================================================
+   DATE HELPERS (STRING SAFE)
+===================================================== */
+const todayDate = () => new Date().toLocaleDateString("en-CA");
+const tomorrowDate = () =>
+  new Date(Date.now() + 86400000).toLocaleDateString("en-CA");
+
+const normalizeDate = (d) => (d ? d.slice(0, 10) : "");
+
+/* range check: start <= target <= end */
+const isDateInRange = (target, start, end) => {
+  return target >= start && target <= end;
+};
+
+/* =====================================================
    DASHBOARD
 ===================================================== */
 const AdminDashboard = () => {
   const [totalStudents, setTotalStudents] = useState(0);
   const [occupiedRooms, setOccupiedRooms] = useState(0);
-  const [complaintTotal, setComplaintTotal] = useState(0);
   const [complaintPending, setComplaintPending] = useState(0);
+  const [complaintTotal, setComplaintTotal] = useState(0);
   const [apologyPending, setApologyPending] = useState(0);
+
   const [messcutPending, setMesscutPending] = useState(0);
   const [leavingToday, setLeavingToday] = useState(0);
   const [returningToday, setReturningToday] = useState(0);
+  const [leavingTomorrow, setLeavingTomorrow] = useState(0);
+  const [returningTomorrow, setReturningTomorrow] = useState(0);
+  const [messcutTomorrow, setMesscutTomorrow] = useState(0);
 
   useEffect(() => {
     refreshAll();
   }, []);
 
-const refreshAll = async () => {
-  try {
-    const [
-      studentsRes,
-      complaintRes,
-      apologyRes,
-      messcutDetailsRes,
-      messcutPendingRes,
-    ] = await Promise.all([
-      axios.get(`${API_URL}/studentprofile/api`),
-      axios.get(`${API_URL}/allcomplaint/count`),
-      axios.get(`${API_URL}/count/pending`),
-      axios.get(`${API_URL}/api/messcut/all-details`),
-      axios.get(`${API_URL}/messcut/clear/count`),
-    ]);
+  const refreshAll = async () => {
+    try {
+      const [
+        studentsRes,
+        complaintRes,
+        apologyRes,
+        messcutRes,
+      ] = await Promise.all([
+        axios.get(`${API_URL}/studentprofile/api`),
+        axios.get(`${API_URL}/allcomplaint/count`),
+        axios.get(`${API_URL}/count/pending`),
+        axios.get(`${API_URL}/api/messcut/all-details`),
+      ]);
 
-    /* =====================================================
-       STUDENT COUNT (ACCURATE)
-    ===================================================== */
-    const students = studentsRes.data.data || [];
-    const totalStudentCount = students.length;
+      /* STUDENTS */
+      const users = studentsRes.data?.data || [];
+      const students = users.filter(
+        (u) => u.Role?.toLowerCase() !== "admin"
+      );
 
-    /* =====================================================
-       OCCUPIED ROOMS COUNT (roomNo EXISTS)
-       👉 one student = one occupied room count
-    ===================================================== */
-const occupiedRoomCount = new Set(
-  students
-    .filter(s => s.roomNo && s.roomNo.trim() !== "")
-    .map(s => s.roomNo.trim().toUpperCase())
-).size;
+      setTotalStudents(students.length);
 
-setTotalStudents(totalStudentCount);
-setOccupiedRooms(occupiedRoomCount);
-    /* =====================================================
-       COMPLAINTS
-    ===================================================== */
-    setComplaintTotal(complaintRes.data.data?.total || 0);
-    setComplaintPending(complaintRes.data.data?.pending || 0);
+      const occupied = new Set(
+        students
+          .filter((s) => s.roomNo)
+          .map((s) => s.roomNo.trim().toUpperCase())
+      ).size;
+      setOccupiedRooms(occupied);
 
-    /* =====================================================
-       APOLOGIES
-    ===================================================== */
-    setApologyPending(apologyRes.data.data?.pending || 0);
+      /* COMPLAINT / APOLOGY */
+      setComplaintTotal(complaintRes.data?.data?.total || 0);
+      setComplaintPending(complaintRes.data?.data?.pending || 0);
+      setApologyPending(apologyRes.data?.data?.pending || 0);
 
-    /* =====================================================
-       LEAVING / RETURNING TODAY (MESSCUT)
-    ===================================================== */
-    const today = new Date().toISOString().split("T")[0];
-    let leaving = 0;
-    let returning = 0;
+      /* MESSCUT LOGIC (FINAL & CORRECT) */
+      const messcuts = messcutRes.data?.data || [];
 
-    (messcutDetailsRes.data.data || []).forEach((d) => {
-      if (d.status === "ACCEPT") {
-        if (d.leavingDate === today) leaving++;
-        if (d.returningDate === today) returning++;
-      }
-    });
+      const today = todayDate();
+      const tomorrow = tomorrowDate();
 
-    setLeavingToday(leaving);
-    setReturningToday(returning);
+      let pending = 0;
+      let leaveToday = 0;
+      let returnToday = 0;
+      let leaveTomorrow = 0;
+      let returnTomorrow = 0;
+      let tomorrowMesscut = 0;
 
-    /* =====================================================
-       PENDING MESSCUT
-    ===================================================== */
-    setMesscutPending(messcutPendingRes.data.data?.pending || 0);
+      messcuts.forEach((m) => {
+        const status = m.status?.toUpperCase();
+        const leave = normalizeDate(m.leavingDate);
+        const ret = normalizeDate(m.returningDate);
 
-    /* =====================================================
-       DEBUG (OPTIONAL – REMOVE LATER)
-    ===================================================== */
-    console.log("✅ Total Students:", totalStudentCount);
-    console.log("🏠 Occupied Rooms:", occupiedRoomCount);
+        if (status === "PENDING") pending++;
 
-  } catch (error) {
-    console.error("❌ Dashboard API error:", error);
-  }
-};
+        if (status === "ACCEPT") {
+          if (leave === today) leaveToday++;
+          if (ret === today) returnToday++;
 
+          if (leave === tomorrow) leaveTomorrow++;
+          if (ret === tomorrow) returnTomorrow++;
 
+          // ✅ ACTIVE MESSCUT TOMORROW (RANGE CHECK)
+          if (isDateInRange(tomorrow, leave, ret)) {
+            tomorrowMesscut++;
+          }
+        }
+      });
+
+      setMesscutPending(pending);
+      setLeavingToday(leaveToday);
+      setReturningToday(returnToday);
+      setLeavingTomorrow(leaveTomorrow);
+      setReturningTomorrow(returnTomorrow);
+      setMesscutTomorrow(tomorrowMesscut);
+
+    } catch (err) {
+      console.error("Dashboard error:", err);
+    }
+  };
+
+  /* PIE DATA */
   const pieSmall = {
-    labels: ["Messcut", "Complaints", "Apologies"],
+    labels: ["Pending Messcut", "Complaints", "Apologies"],
     datasets: [
       {
         data: [messcutPending, complaintTotal, apologyPending],
@@ -258,11 +274,11 @@ setOccupiedRooms(occupiedRoomCount);
     labels: [
       "Students",
       "Rooms",
-      "Complaints",
-      "Apology",
-      "Messcut",
-      "Leaving",
-      "Returning",
+      "Pending Complaints",
+      "Pending Apologies",
+      "Pending Messcut",
+      "Leaving Today",
+      "Returning Today",
     ],
     datasets: [
       {
@@ -289,20 +305,14 @@ setOccupiedRooms(occupiedRoomCount);
   };
 
   return (
-    <Box sx={{ p: 4, minHeight: "100vh", background: "#f5f7fb" }}>
-      {/* HEADER */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={3}
-      >
+    <Box sx={{ p: 4, background: "#f5f7fb", minHeight: "100vh" }}>
+      <Box display="flex" justifyContent="space-between" mb={3}>
         <Box>
           <Typography variant="h5" fontWeight={700}>
             Admin Dashboard
           </Typography>
           <Typography fontSize={13} color="text.secondary">
-            Hostel & Student Management Overview
+            Hostel & Student Overview
           </Typography>
         </Box>
         <IconButton onClick={refreshAll}>
@@ -312,99 +322,30 @@ setOccupiedRooms(occupiedRoomCount);
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* TOP STATS */}
       <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Total Students"
-            value={totalStudents}
-            icon={<People />}
-            color="#1E88E5"
-            delay={0}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Occupied Rooms"
-            value={occupiedRooms}
-            icon={<MeetingRoom />}
-            color="#43A047"
-            delay={0.1}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Pending Complaints"
-            value={complaintPending}
-            icon={<BugReport />}
-            color="#E53935"
-            delay={0.2}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard
-            title="Pending Apologies"
-            value={apologyPending}
-            icon={<Rule />}
-            color="#FB8C00"
-            delay={0.3}
-          />
-        </Grid>
+        <Grid item xs={12} md={3}><StatCard title="Total Students" value={totalStudents} icon={<People />} color="#1E88E5" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Occupied Rooms" value={occupiedRooms} icon={<MeetingRoom />} color="#43A047" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Pending Complaints" value={complaintPending} icon={<BugReport />} color="#E53935" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Pending Apologies" value={apologyPending} icon={<Rule />} color="#FB8C00" /></Grid>
+
+        <Grid item xs={12} md={3}><StatCard title="Pending Messcut" value={messcutPending} icon={<Restaurant />} color="#5E35B1" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Leaving Today" value={leavingToday} icon={<EventBusy />} color="#C2185B" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Returning Today" value={returningToday} icon={<EventAvailable />} color="#00897B" /></Grid>
+        <Grid item xs={12} md={3}><StatCard title="Messcut Tomorrow" value={messcutTomorrow} icon={<EventSeat />} color="#7B1FA2" /></Grid>
       </Grid>
 
-      {/* BOTTOM STATS */}
-      <Grid container spacing={3} mt={1}>
-        <Grid item xs={12} md={4}>
-          <StatCard
-            title="Pending Messcut"
-            value={messcutPending}
-            icon={<Restaurant />}
-            color="#5E35B1"
-            delay={0.4}
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <StatCard
-            title="Leaving Today"
-            value={leavingToday}
-            icon={<EventBusy />}
-            color="#C2185B"
-            delay={0.5}
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <StatCard
-            title="Returning Today"
-            value={returningToday}
-            icon={<EventAvailable />}
-            color="#00897B"
-            delay={0.6}
-          />
-        </Grid>
-      </Grid>
-
-      {/* CHARTS */}
       <Grid container spacing={3} mt={3}>
         <Grid item xs={12} md={6}>
-          <motion.div variants={fadeUp} initial="hidden" animate="visible">
-            <Card sx={{ p: 3, borderRadius: 3 }}>
-              <Typography fontWeight={600} mb={2}>
-                Overall Summary
-              </Typography>
-              <PieWrapper data={pieFull} />
-            </Card>
-          </motion.div>
+          <Card sx={{ p: 3 }}>
+            <Typography fontWeight={600} mb={2}>Overall Summary</Typography>
+            <PieWrapper data={pieFull} />
+          </Card>
         </Grid>
-
         <Grid item xs={12} md={6}>
-          <motion.div variants={fadeUp} initial="hidden" animate="visible">
-            <Card sx={{ p: 3, borderRadius: 3 }}>
-              <Typography fontWeight={600} mb={2}>
-                Complaints / Messcut / Apology
-              </Typography>
-              <PieWrapper data={pieSmall} />
-            </Card>
-          </motion.div>
+          <Card sx={{ p: 3 }}>
+            <Typography fontWeight={600} mb={2}>Pending Summary</Typography>
+            <PieWrapper data={pieSmall} />
+          </Card>
         </Grid>
       </Grid>
     </Box>
