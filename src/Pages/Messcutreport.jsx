@@ -231,6 +231,7 @@ const prepareDetails = () =>
 
     Reason: d.reason,
     Status: d.status,
+    "Parent Status": d.parentStatus || "PENDING",
   }));
 
  const exportExcel = async (rows, filename) => {
@@ -355,6 +356,15 @@ const prepareDetails = () =>
     });
     doc.save(`${filename}.pdf`);
   };
+const getParentStatusBadge = (status) => {
+  if (status === "APPROVE") {
+    return <Badge bg="success">APPROVED</Badge>;
+  }
+  if (status === "REJECT") {
+    return <Badge bg="danger">REJECTED</Badge>;
+  }
+  return <Badge bg="warning" text="dark">PENDING</Badge>;
+};
 
   // ===============================
   // UI
@@ -456,6 +466,7 @@ const prepareDetails = () =>
                   <th>Messcut</th>
                   <th>Reason</th>
                   <th>Status</th>
+                  <th>Parent Status</th>
                 </tr>
               </thead>
 
@@ -488,6 +499,9 @@ const prepareDetails = () =>
                     <td className="text-center">
                       <Badge bg="secondary">{d.status}</Badge>
                     </td>
+                    <td className="text-center">
+  {getParentStatusBadge(d.parentStatus)}
+</td>
                   </tr>
                 ))}
               </tbody>

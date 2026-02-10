@@ -114,7 +114,8 @@ const AttendanceReport = () => {
       }));
 
       setPublished(baseList.length > 0 ? baseList[0].published || "none" : "none");
-      setData(baseList);
+    setData(sortByRoomAndName(baseList));
+
       setIsLoaded(true);
       showToast("Data loaded successfully!");
     } catch (err) {
@@ -124,11 +125,16 @@ const AttendanceReport = () => {
   };
 
   /* ================= TOGGLE ================= */
-  const toggleAttendance = (index) => {
-    const updated = [...data];
-    updated[index].attendance = !updated[index].attendance;
-    setData(updated);
-  };
+const toggleAttendance = (admissionNumber) => {
+  setData((prev) =>
+    prev.map((student) =>
+      student.admissionNumber === admissionNumber
+        ? { ...student, attendance: !student.attendance }
+        : student
+    )
+  );
+};
+
 
   /* ================= SAVE ================= */
   const handleSave = async () => {
@@ -271,6 +277,20 @@ const AttendanceReport = () => {
     saveAs(new Blob([buffer]), `Attendance_Report_${date}.xlsx`);
     showToast("Excel downloaded successfully!", "success");
   };
+const sortByRoomAndName = (list) => {
+  return [...list].sort((a, b) => {
+    // Room number comparison (numeric-safe)
+    const roomA = parseInt(a.roomNo, 10) || 0;
+    const roomB = parseInt(b.roomNo, 10) || 0;
+
+    if (roomA !== roomB) {
+      return roomA - roomB;
+    }
+
+    // If same room → sort by name
+    return a.name.localeCompare(b.name);
+  });
+};
 
   /* ================= PDF EXPORT ================= */
   const handleExportPDF = () => {
@@ -308,12 +328,14 @@ const AttendanceReport = () => {
   };
 
   /* ================= FILTER ================= */
-  const filteredData = data.filter(
+const filteredData = sortByRoomAndName(
+  data.filter(
     (item) =>
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.semesterShort.toLowerCase().includes(search.toLowerCase()) ||
       item.roomNo.toString().includes(search)
-  );
+  )
+);
 
   const presentCount = data.filter((d) => d.attendance === true).length;
   const absentCount = data.filter((d) => d.attendance === false).length;
@@ -387,7 +409,8 @@ const AttendanceReport = () => {
                   <Checkbox
                     size="small"
                     checked={row.attendance}
-                    onChange={() => toggleAttendance(i)}
+           onChange={() => toggleAttendance(row.admissionNumber)}
+
                     color="primary"
                     sx={{ p: 0 }}
                   />
@@ -706,8 +729,8 @@ const AttendanceReport = () => {
                         <Checkbox
                           size="medium"
                           checked={row.attendance}
-                          onChange={() => toggleAttendance(i)}
-                          color="primary"
+onChange={() => toggleAttendance(row.admissionNumber)}
+
                         />
                       </TableCell>
                     </TableRow>
