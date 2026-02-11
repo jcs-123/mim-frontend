@@ -40,6 +40,7 @@ import {
   Sms,
   CompareArrows,
   Nightlife,
+  EditCalendar, // Add this import
 } from "@mui/icons-material";
 import { Link, useLocation } from "react-router-dom";
 import PaymentsIcon from "@mui/icons-material/Payments";
@@ -69,6 +70,11 @@ function Sidebar({ mobileOpen, handleDrawerToggle }) {
     },
 
     { text: "Mess Cut Report", icon: <Report />, path: "/mess-cut-report" },
+    {
+      text: "Messcut Management",
+      icon: <EditCalendar />, // Make sure to import EditCalendar from @mui/icons-material
+      path: "/messcut-management",
+    },
     { text: "Name Wise Report", icon: <People />, path: "/name-wise-report" },
     { text: "Date Wise Report", icon: <CalendarMonth />, path: "/date-wise-report" },
     {
