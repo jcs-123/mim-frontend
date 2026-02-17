@@ -226,26 +226,29 @@ const AdminDashboard = () => {
       let returnTomorrow = 0;
       let tomorrowMesscut = 0;
 
-      messcuts.forEach((m) => {
-        const status = m.status?.toUpperCase();
-        const leave = normalizeDate(m.leavingDate);
-        const ret = normalizeDate(m.returningDate);
+     messcuts.forEach((m) => {
+  const status = m.status?.toUpperCase();
+  const leave = normalizeDate(m.leavingDate);
+  const ret = normalizeDate(m.returningDate);
 
-        if (status === "PENDING") pending++;
+  if (status === "PENDING") pending++;
 
-        if (status === "ACCEPT") {
-          if (leave === today) leaveToday++;
-          if (ret === today) returnToday++;
+  if (status === "ACCEPT") {
 
-          if (leave === tomorrow) leaveTomorrow++;
-          if (ret === tomorrow) returnTomorrow++;
+    // Leaving / Returning counters (keep this as it is)
+    if (leave === today) leaveToday++;
+    if (ret === today) returnToday++;
 
-          // ✅ ACTIVE MESSCUT TOMORROW (RANGE CHECK)
-          if (isDateInRange(tomorrow, leave, ret)) {
-            tomorrowMesscut++;
-          }
-        }
-      });
+    if (leave === tomorrow) leaveTomorrow++;
+    if (ret === tomorrow) returnTomorrow++;
+
+    // ✅ STRICT INSIDE RANGE ONLY (not leave, not return)
+    if (tomorrow > leave && tomorrow < ret) {
+      tomorrowMesscut++;
+    }
+  }
+});
+
 
       setMesscutPending(pending);
       setLeavingToday(leaveToday);
