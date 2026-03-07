@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Container,
@@ -36,105 +34,123 @@ const MesscutReport = () => {
   const [toDate, setToDate] = useState("");
 
   const [loading, setLoading] = useState(false);
-const [feeDueMap, setFeeDueMap] = useState({});
-const [feeLoading, setFeeLoading] = useState(false);
-useEffect(() => {
-  const fetchAllFees = async () => {
-    setFeeLoading(true);
-    try {
-      const res = await axios.get("https://mim-backend-b5cd.onrender.com/fees/get");
-      if (res.data.success) {
-        const map = {};
-        res.data.data.forEach((fee) => {
-          map[fee.admissionNumber] = fee.totalDue || 0;
-        });
-        setFeeDueMap(map);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFeeLoading(false);
-    }
+
+
+  // ===============================
+  // FORMAT DATE & TIME HELPERS
+  // ===============================
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return "-";
+    
+    const date = new Date(timestamp);
+    
+    // Format: 13 Feb 2026, 02:47 PM
+    return date.toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata"
+    });
   };
 
-  fetchAllFees();
-}, []);
+  const formatDateOnly = (timestamp) => {
+    if (!timestamp) return "-";
+    
+    const date = new Date(timestamp);
+    return date.toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata"
+    });
+  };
 
-const isMesscutBlocked = (admissionNumber) =>
-  (feeDueMap[admissionNumber] || 0) >= 10000;
+  const formatTimeOnly = (timestamp) => {
+    if (!timestamp) return "-";
+    
+    const date = new Date(timestamp);
+    return date.toLocaleString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata"
+    });
+  };
 
-const calculateMesscutWithFeeCheck = (adm, leave, ret) => {
-  if (isMesscutBlocked(adm)) return 0;
+
+
+  
+const calculateMesscutWithFeeCheck = (feedue, leave, ret) => {
+  if (feedue === "OVER") return 0;
   return calculateMesscut(leave, ret);
 };
 
-const calculateDurationWithFeeCheck = (adm, leave, ret) => {
-  if (isMesscutBlocked(adm)) return "0 days";
-  return calculateDuration(leave, ret);
-};
-
+  const calculateDurationWithFeeCheck = (adm, leave, ret) => {
+    if (isMesscutBlocked(adm)) return "0 days";
+    return calculateDuration(leave, ret);
+  };
 
   // ===============================
   // CALCULATIONS
   // ===============================
-const calculateMesscut = (leave, ret) => {
-  try {
-    const d1 = new Date(leave);
-    const d2 = new Date(ret);
+  const calculateMesscut = (leave, ret) => {
+    try {
+      const d1 = new Date(leave);
+      const d2 = new Date(ret);
 
-    const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)); 
-    const effective = diff - 1; // exclude leaving day
+      const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)); 
+      const effective = diff - 1; // exclude leaving day
 
-    // ⭐ RULE: Minimum 2 days required for messcut
-    if (effective < 2) return 0;
+      // ⭐ RULE: Minimum 2 days required for messcut
+      if (effective < 2) return 0;
 
-    return effective;
-  } catch {
-    return 0;
-  }
-};
+      return effective;
+    } catch {
+      return 0;
+    }
+  };
 
-const calculateDuration = (leave, ret) => {
-  try {
-    const d1 = new Date(leave);
-    const d2 = new Date(ret);
+  const calculateDuration = (leave, ret) => {
+    try {
+      const d1 = new Date(leave);
+      const d2 = new Date(ret);
 
-    const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
-    const effective = diff - 1;
+      const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+      const effective = diff - 1;
 
-    // ⭐ RULE: If below 2 days, duration is 0 days
-    if (effective < 2) return "0 days";
+      // ⭐ RULE: If below 2 days, duration is 0 days
+      if (effective < 2) return "0 days";
 
-    return `${effective} day${effective !== 1 ? "s" : ""}`;
-  } catch {
-    return "0 days";
-  }
-};
-
-
+      return `${effective} day${effective !== 1 ? "s" : ""}`;
+    } catch {
+      return "0 days";
+    }
+  };
 
   // ===============================
   // FETCH DATA
   // ===============================
-const fetchReport = async () => {
-  setLoading(true);
-  try {
-    const summaryRes = await axios.get(`${API_URL}/api/messcut/report`);
-    const detailsRes = await axios.get(`${API_URL}/api/messcut/all-details`);
+  const fetchReport = async () => {
+    setLoading(true);
+    try {
+      const summaryRes = await axios.get(`${API_URL}/api/messcut/report`);
+      const detailsRes = await axios.get(`${API_URL}/api/messcut/all-details`);
 
-    setSummary(summaryRes.data.data || []);
+      setSummary(summaryRes.data.data || []);
 
-    // ⭐ FILTER ONLY ACCEPTED RECORDS ⭐
-    const accepted = (detailsRes.data.data || []).filter(
-      (d) => d.status === "ACCEPT"
-    );
+      // ⭐ FILTER ONLY ACCEPTED RECORDS ⭐
+      const accepted = (detailsRes.data.data || []).filter(
+        (d) => d.status === "ACCEPT"
+      );
 
-    setDetails(accepted);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setDetails(accepted);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchReport();
@@ -212,96 +228,87 @@ const fetchReport = async () => {
 const prepareDetails = () =>
   filteredDetails.map((d, i) => ({
     "#": i + 1,
-    Name: d.name,
-    "Admission No": d.admissionNumber,
-    "Leaving Date": d.leavingDate,
-    "Returning Date": d.returningDate,
 
-    // ✅ APPLY FEE CHECK HERE
-   Duration: calculateDuration(d.leavingDate, d.returningDate),
+    Name: d.name,
+
+    "Admission No": d.admissionNumber,
+
+    "Leaving Date": formatDateOnly(d.leavingDate),
+
+    "Returning Date": formatDateOnly(d.returningDate),
+
+    "Submitted Date": formatDateOnly(d.createdAt),
+
+    "Submitted Time": formatTimeOnly(d.createdAt),
+
+    Duration: calculateDuration(d.leavingDate, d.returningDate),
 
     Messcut: calculateMesscutWithFeeCheck(
-      d.admissionNumber,
+      d.feedue,
       d.leavingDate,
       d.returningDate
     ),
 
-    // ✅ OPTIONAL (VERY USEFUL IN EXPORT)
-    "Fee Due": feeDueMap[d.admissionNumber] || 0,
+    "Fee Status": d.feedue === "OVER" ? "Fee Due" : "Normal",
 
     Reason: d.reason,
+
     Status: d.status,
+
     "Parent Status": d.parentStatus || "PENDING",
   }));
 
- const exportExcel = async (rows, filename) => {
-  if (!rows.length) return alert("No data!");
+  const exportExcel = async (rows, filename) => {
+    if (!rows.length) return alert("No data!");
 
-  try {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Report");
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Report");
 
-    const headers = Object.keys(rows[0]);
+      const headers = Object.keys(rows[0]);
 
-    // ----------------------------------------------------
-    // ADD TITLE ROW (MERGED)
-    // ----------------------------------------------------
-    const title = "Messcut Report";
+      // ----------------------------------------------------
+      // ADD TITLE ROW (MERGED)
+      // ----------------------------------------------------
+      const title = "Messcut Report";
 
-    // Merge cells for title across all header columns
-    sheet.mergeCells(1, 1, 1, headers.length);
+      // Merge cells for title across all header columns
+      sheet.mergeCells(1, 1, 1, headers.length);
 
-    const titleCell = sheet.getCell("A1");
-    titleCell.value = title;
+      const titleCell = sheet.getCell("A1");
+      titleCell.value = title;
 
-    // Title styling
-    titleCell.font = {
-      bold: true,
-      size: 16,
-      color: { argb: "FFFFFFFF" },
-    };
+      // Title styling
+      titleCell.font = {
+        bold: true,
+        size: 16,
+        color: { argb: "FFFFFFFF" },
+      };
 
-    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
 
-    titleCell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF2E75B6" }, // Blue background
-    };
-
-    // Increase title row height
-    sheet.getRow(1).height = 25;
-
-    // ----------------------------------------------------
-    // HEADER ROW (Row 2)
-    // ----------------------------------------------------
-    const headerRow = sheet.addRow(headers);
-
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
-      cell.alignment = { horizontal: "center", vertical: "middle" };
-      cell.fill = {
+      titleCell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF1F4E78" }, // Dark blue header
+        fgColor: { argb: "FF2E75B6" }, // Blue background
       };
-      cell.border = {
-        top: { style: "thin" },
-        bottom: { style: "thin" },
-        left: { style: "thin" },
-        right: { style: "thin" },
-      };
-    });
 
-    // ----------------------------------------------------
-    // DATA ROWS
-    // ----------------------------------------------------
-    rows.forEach((row, index) => {
-      const newRow = sheet.addRow(Object.values(row));
+      // Increase title row height
+      sheet.getRow(1).height = 25;
 
-      newRow.eachCell((cell) => {
-        cell.alignment = { horizontal: "center" };
+      // ----------------------------------------------------
+      // HEADER ROW (Row 2)
+      // ----------------------------------------------------
+      const headerRow = sheet.addRow(headers);
 
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 12, color: { argb: "FFFFFFFF" } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF1F4E78" }, // Dark blue header
+        };
         cell.border = {
           top: { style: "thin" },
           bottom: { style: "thin" },
@@ -310,41 +317,57 @@ const prepareDetails = () =>
         };
       });
 
-      // Alternate row color (light gray)
-      if (index % 2 === 0) {
+      // ----------------------------------------------------
+      // DATA ROWS
+      // ----------------------------------------------------
+      rows.forEach((row, index) => {
+        const newRow = sheet.addRow(Object.values(row));
+
         newRow.eachCell((cell) => {
-          cell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: "FFF2F2F2" },
+          cell.alignment = { horizontal: "center" };
+
+          cell.border = {
+            top: { style: "thin" },
+            bottom: { style: "thin" },
+            left: { style: "thin" },
+            right: { style: "thin" },
           };
         });
-      }
-    });
 
-    // ----------------------------------------------------
-    // AUTO COLUMN WIDTH
-    // ----------------------------------------------------
-    sheet.columns.forEach((col) => {
-      let maxLength = 10;
-      col.eachCell({ includeEmpty: true }, (cell) => {
-        const val = cell.value ? cell.value.toString().length : 10;
-        if (val > maxLength) maxLength = val;
+        // Alternate row color (light gray)
+        if (index % 2 === 0) {
+          newRow.eachCell((cell) => {
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFF2F2F2" },
+            };
+          });
+        }
       });
-      col.width = maxLength + 5;
-    });
 
-    // ----------------------------------------------------
-    // EXPORT FILE
-    // ----------------------------------------------------
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `${filename}.xlsx`);
+      // ----------------------------------------------------
+      // AUTO COLUMN WIDTH
+      // ----------------------------------------------------
+      sheet.columns.forEach((col) => {
+        let maxLength = 10;
+        col.eachCell({ includeEmpty: true }, (cell) => {
+          const val = cell.value ? cell.value.toString().length : 10;
+          if (val > maxLength) maxLength = val;
+        });
+        col.width = maxLength + 5;
+      });
 
-  } catch (error) {
-    console.error("Excel export error:", error);
-  }
-};
+      // ----------------------------------------------------
+      // EXPORT FILE
+      // ----------------------------------------------------
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), `${filename}.xlsx`);
 
+    } catch (error) {
+      console.error("Excel export error:", error);
+    }
+  };
 
   const exportPDF = (rows, filename) => {
     if (!rows.length) return alert("No data!");
@@ -356,15 +379,16 @@ const prepareDetails = () =>
     });
     doc.save(`${filename}.pdf`);
   };
-const getParentStatusBadge = (status) => {
-  if (status === "APPROVE") {
-    return <Badge bg="success">APPROVED</Badge>;
-  }
-  if (status === "REJECT") {
-    return <Badge bg="danger">REJECTED</Badge>;
-  }
-  return <Badge bg="warning" text="dark">PENDING</Badge>;
-};
+
+  const getParentStatusBadge = (status) => {
+    if (status === "APPROVE") {
+      return <Badge bg="success">APPROVED</Badge>;
+    }
+    if (status === "REJECT") {
+      return <Badge bg="danger">REJECTED</Badge>;
+    }
+    return <Badge bg="warning" text="dark">PENDING</Badge>;
+  };
 
   // ===============================
   // UI
@@ -426,10 +450,9 @@ const getParentStatusBadge = (status) => {
         </Card.Body>
       </Card>
 
-
       {/* FULL DETAILS TABLE */}
       <Card>
-        <Card.Header className="fw-bold d-flex justify-content-between">
+        <Card.Header className="fw-bold d-flex justify-content-between align-items-center">
           <span>All Leave Records</span>
 
           <div className="d-flex gap-2">
@@ -462,6 +485,7 @@ const getParentStatusBadge = (status) => {
                   <th>Admission No</th>
                   <th>Leaving</th>
                   <th>Returning</th>
+                  <th>Submitted On</th>
                   <th>Duration</th>
                   <th>Messcut</th>
                   <th>Reason</th>
@@ -478,20 +502,29 @@ const getParentStatusBadge = (status) => {
                     <td>{d.admissionNumber}</td>
                     <td>{d.leavingDate}</td>
                     <td>{d.returningDate}</td>
+                    <td className="text-center">
+                      <div>
+                        <small>
+                          <strong>{formatDateOnly(d.createdAt)}</strong>
+                        </small>
+                        <br />
+                        <small className="text-muted">
+                          {formatTimeOnly(d.createdAt)}
+                        </small>
+                      </div>
+                    </td>
                     <td className="text-center">{calculateDuration(d.leavingDate, d.returningDate)}</td>
                   
-<td className="text-center fw-bold">
+               <td className="text-center fw-bold">
   {calculateMesscutWithFeeCheck(
-    d.admissionNumber,
+    d.feedue,
     d.leavingDate,
     d.returningDate
   )}
 
-  {isMesscutBlocked(d.admissionNumber) && (
+  {d.feedue === "OVER" && (
     <div className="mt-1">
-      <Badge bg="danger">
-        Fee Due ₹{feeDueMap[d.admissionNumber]}
-      </Badge>
+      <Badge bg="danger">Fee Due</Badge>
     </div>
   )}
 </td>
@@ -500,8 +533,8 @@ const getParentStatusBadge = (status) => {
                       <Badge bg="secondary">{d.status}</Badge>
                     </td>
                     <td className="text-center">
-  {getParentStatusBadge(d.parentStatus)}
-</td>
+                      {getParentStatusBadge(d.parentStatus)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

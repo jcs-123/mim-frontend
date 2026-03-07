@@ -65,7 +65,7 @@ const UserForm = () => {
   const [openOneDayOuting, setOpenOneDayOuting] = useState(false);
   const [lockedDates, setLockedDates] = useState([]); // ⚠️ CHANGED: renamed for clarity
   const [holidays, setHolidays] = useState([]);
-  
+  const [feePopupShown, setFeePopupShown] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -239,14 +239,31 @@ const UserForm = () => {
           `https://mim-backend-b5cd.onrender.com/fees/get/${storedUser.admissionNumber}`
         );
 
-        if (res.data.success) {
-          setFeeData({
-            totalFee: res.data.data.totalFee || 0,
-            totalPaid: res.data.data.totalPaid || 0,
-            totalDue: res.data.data.totalDue || 0,
-          });
-          console.log("✅ Fee data loaded");
-        }
+    if (res.data.success) {
+  const feeInfo = {
+    totalFee: res.data.data.totalFee || 0,
+    totalPaid: res.data.data.totalPaid || 0,
+    totalDue: res.data.data.totalDue || 0,
+  };
+
+  setFeeData(feeInfo);
+
+  // ✅ SINGLE toast only
+if (feeInfo.totalDue >= 10000) {
+  toast.error(
+    `⚠️ Mess Cut Request Blocked!
+
+You have ₹${feeInfo.totalDue} pending hostel fee.
+
+Please clear the outstanding dues to enable mess cut requests.`,
+    {
+      autoClose: 6000,
+      toastId: "FEE_DUE_ALERT"
+    }
+  );
+}
+  console.log("✅ Fee data loaded");
+}
       } catch (error) {
         console.error("❌ Error fetching fee data:", error);
       }
@@ -334,7 +351,7 @@ const UserForm = () => {
       }
 
       // --- RETURNING DATE VALIDATION ---
- // --- RETURNING DATE VALIDATION ---
+     // --- RETURNING DATE VALIDATION ---
 if (name === "returningDate") {
   if (!prev.leavingDate) {
     toast.warning("⚠️ Please select leaving date first!");
@@ -425,15 +442,20 @@ const handleMesscutSubmit = async () => {
     return;
   }
 
-  if (feeData.totalDue >= 10000) {
-    toast.error(`❌ Mess cut blocked. Clear fee dues ₹${feeData.totalDue}`);
-    return;
-  }
-
   try {
+
+    // ✅ Determine fee due status
+    const feedueStatus = feeData.totalDue >= 10000 ? "OVER" : "NORMAL";
+
+    // ✅ Send payload with feedue status
+    const payload = {
+      ...formData,
+      feedue: feedueStatus
+    };
+
     const res = await axios.post(
       `https://mim-backend-b5cd.onrender.com/adddetail`,
-      formData
+      payload
     );
 
     if (res.data?.success) {
@@ -452,6 +474,7 @@ const handleMesscutSubmit = async () => {
     } else {
       toast.error(res.data?.message || "❌ Submission failed!");
     }
+
   } catch (err) {
     toast.error("❌ Server error. Try again.");
   }
